@@ -457,10 +457,17 @@ function saveGeocodeCache() {
 
 // ==================== Geocoding (Google Maps) ====================
 async function geocodeAddress(rawAddress, cleanedAddress) {
-  // Use raw address as cache key
+  // Check cache: try raw address first, then cleaned address as fallback
   if (geocodeCache[rawAddress]) {
-    console.log(`[Geocode] 📦 快取命中: "${rawAddress}"`);
+    console.log(`[Geocode] 📦 快取命中 (raw): "${rawAddress}"`);
     return geocodeCache[rawAddress];
+  }
+  if (geocodeCache[cleanedAddress]) {
+    console.log(`[Geocode] 📦 快取命中 (cleaned): "${cleanedAddress}"`);
+    // Also store under raw key for faster future lookups
+    geocodeCache[rawAddress] = geocodeCache[cleanedAddress];
+    saveGeocodeCache();
+    return geocodeCache[cleanedAddress];
   }
 
   console.log(`[Geocode] 🔍 快取未命中，呼叫 API: "${cleanedAddress}"`);
@@ -481,8 +488,9 @@ async function geocodeAddress(rawAddress, cleanedAddress) {
     if (data.status === 'OK' && data.results.length > 0) {
       const loc = data.results[0].geometry.location;
       const result = { lat: loc.lat, lng: loc.lng };
-      // Save to cache with raw address as key
+      // Save to cache with both keys
       geocodeCache[rawAddress] = result;
+      geocodeCache[cleanedAddress] = result;
       saveGeocodeCache();
       console.log(`[Geocode] 💾 已存入快取: "${rawAddress}"`);
       return result;
