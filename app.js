@@ -636,10 +636,26 @@ function escHtml(str) {
 }
 
 // ==================== Delivered State ====================
+function getTodayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function loadDeliveredState() {
   try {
     const saved = localStorage.getItem('delivered_items');
-    if (saved) deliveredSet = new Set(JSON.parse(saved));
+    const savedDate = localStorage.getItem('delivered_items_date');
+    const today = getTodayStr();
+
+    if (savedDate !== today) {
+      // 隔日自動清空
+      deliveredSet = new Set();
+      localStorage.removeItem('delivered_items');
+      localStorage.setItem('delivered_items_date', today);
+      console.log(`[Delivered] 🗑️ 隔日清空 (上次: ${savedDate || '無'}, 今天: ${today})`);
+    } else if (saved) {
+      deliveredSet = new Set(JSON.parse(saved));
+    }
   } catch (e) {
     deliveredSet = new Set();
   }
@@ -647,6 +663,7 @@ function loadDeliveredState() {
 
 function saveDeliveredState() {
   localStorage.setItem('delivered_items', JSON.stringify([...deliveredSet]));
+  localStorage.setItem('delivered_items_date', getTodayStr());
 }
 
 function toggleDelivered(detailNo, isChecked) {
