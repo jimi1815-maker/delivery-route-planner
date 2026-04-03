@@ -1,6 +1,9 @@
 # CSV data files
 csv/
 
+# Local data (business info)
+localstorage.json
+
 # OS files
 .DS_Store
 Thumbs.db
