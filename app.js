@@ -463,6 +463,8 @@ async function geocodeAddress(address) {
     return geocodeCache[address];
   }
 
+  console.log(`[Geocode] 🔍 快取未命中，呼叫 API: "${address}"`);
+
   const apiKey = getApiKey();
   if (!apiKey) {
     console.error('[Geocode] 沒有 API Key');
@@ -482,6 +484,7 @@ async function geocodeAddress(address) {
       // Save to cache
       geocodeCache[address] = result;
       saveGeocodeCache();
+      console.log(`[Geocode] 💾 已存入快取: "${address}"`);
       return result;
     }
 
