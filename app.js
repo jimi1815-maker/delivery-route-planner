@@ -65,6 +65,7 @@ const apiKeyStatus = $('#api-key-status');
 // ==================== Initialization ====================
 document.addEventListener('DOMContentLoaded', () => {
   loadDeliveredState();
+  loadGeocodeCache();
   initEventListeners();
   initMap();
   checkApiKey();
@@ -438,8 +439,30 @@ function updateKeyStatus() {
   }
 }
 
+// ==================== Geocode Cache ====================
+let geocodeCache = {};
+
+function loadGeocodeCache() {
+  try {
+    const saved = localStorage.getItem('geocode_cache');
+    if (saved) geocodeCache = JSON.parse(saved);
+  } catch (e) {
+    geocodeCache = {};
+  }
+}
+
+function saveGeocodeCache() {
+  localStorage.setItem('geocode_cache', JSON.stringify(geocodeCache));
+}
+
 // ==================== Geocoding (Google Maps) ====================
 async function geocodeAddress(address) {
+  // Check cache first
+  if (geocodeCache[address]) {
+    console.log(`[Geocode] 📦 快取命中: "${address}"`);
+    return geocodeCache[address];
+  }
+
   const apiKey = getApiKey();
   if (!apiKey) {
     console.error('[Geocode] 沒有 API Key');
@@ -455,7 +478,11 @@ async function geocodeAddress(address) {
     const data = await res.json();
     if (data.status === 'OK' && data.results.length > 0) {
       const loc = data.results[0].geometry.location;
-      return { lat: loc.lat, lng: loc.lng };
+      const result = { lat: loc.lat, lng: loc.lng };
+      // Save to cache
+      geocodeCache[address] = result;
+      saveGeocodeCache();
+      return result;
     }
 
     if (data.status === 'REQUEST_DENIED') {
