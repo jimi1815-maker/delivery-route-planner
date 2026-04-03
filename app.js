@@ -7,6 +7,28 @@ let csvData = [];       // All parsed rows
 let filteredItems = []; // Items filtered by district
 let map = null;         // Leaflet map instance
 let markers = [];       // Leaflet markers
+let deliveredSet = new Set(); // Track delivered item IDs
+
+// ==================== Marker Icons ====================
+const defaultIcon = L.icon({
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
+
+const deliveredIcon = L.icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-grey.png',
+  iconRetinaUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-grey.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
 
 // Column indices (0-based)
 const COL = {
@@ -42,6 +64,7 @@ const apiKeyStatus = $('#api-key-status');
 
 // ==================== Initialization ====================
 document.addEventListener('DOMContentLoaded', () => {
+  loadDeliveredState();
   initEventListeners();
   initMap();
   checkApiKey();
@@ -142,7 +165,14 @@ function clearMarkers() {
 function addMarker(item) {
   if (!item.lat || !item.lng) return;
 
-  const marker = L.marker([item.lat, item.lng]).addTo(map);
+  const isDelivered = deliveredSet.has(item.detailNo);
+  const marker = L.marker([item.lat, item.lng], {
+    icon: isDelivered ? deliveredIcon : defaultIcon,
+    opacity: isDelivered ? 0.5 : 1,
+  }).addTo(map);
+
+  // Store reference for later updates
+  marker._itemDetailNo = item.detailNo;
 
   const phone = item.phone.replace(/\s+/g, '');
   const encodedAddr = encodeURIComponent(item.addressRaw);
@@ -156,6 +186,11 @@ function addMarker(item) {
       <div class="popup-row"><span class="popup-label">電話</span><span class="popup-value"><a href="tel:${phone}">${escHtml(item.phone)}</a></span></div>
       <div class="popup-row"><span class="popup-label">備註</span><span class="popup-value">${escHtml(item.remark || '無')}</span></div>
       <div class="popup-row"><span class="popup-label">托運</span><span class="popup-value">${escHtml(item.shipperName)}</span></div>
+      <label class="popup-delivered-check" onclick="event.stopPropagation()">
+        <input type="checkbox" ${isDelivered ? 'checked' : ''}
+               onchange="toggleDelivered('${escHtml(item.detailNo)}', this.checked)" />
+        <span class="check-label">✅ 已送達</span>
+      </label>
       <a class="navigate-btn" href="${navUrl}" target="_blank" rel="noopener">🧭 Google Maps 導航</a>
     </div>`;
 
@@ -468,8 +503,10 @@ function renderList() {
 
   filteredItems.forEach((item, index) => {
     const card = document.createElement('div');
-    card.className = 'item-card';
+    const isDelivered = deliveredSet.has(item.detailNo);
+    card.className = `item-card${isDelivered ? ' delivered' : ''}`;
     card.id = `card-${item.id}`;
+    card.dataset.detailNo = item.detailNo;
     card.style.animationDelay = `${index * 0.03}s`;
 
     const phone = item.phone.replace(/\s+/g, '');
@@ -478,7 +515,11 @@ function renderList() {
 
     card.innerHTML = `
       <div class="card-header">
-        <span class="receiver-name">${escHtml(item.receiverName)}</span>
+        <label class="card-check" onclick="event.stopPropagation()">
+          <input type="checkbox" ${isDelivered ? 'checked' : ''}
+                 onchange="toggleDelivered('${escHtml(item.detailNo)}', this.checked)" />
+          <span class="receiver-name">${escHtml(item.receiverName)}</span>
+        </label>
         <span class="geocode-dot ${item.geocodeStatus}" id="dot-${item.id}"></span>
       </div>
       <div class="card-address">${escHtml(item.addressRaw)}</div>
@@ -543,6 +584,48 @@ function escHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+// ==================== Delivered State ====================
+function loadDeliveredState() {
+  try {
+    const saved = localStorage.getItem('delivered_items');
+    if (saved) deliveredSet = new Set(JSON.parse(saved));
+  } catch (e) {
+    deliveredSet = new Set();
+  }
+}
+
+function saveDeliveredState() {
+  localStorage.setItem('delivered_items', JSON.stringify([...deliveredSet]));
+}
+
+function toggleDelivered(detailNo, isChecked) {
+  if (isChecked) {
+    deliveredSet.add(detailNo);
+  } else {
+    deliveredSet.delete(detailNo);
+  }
+  saveDeliveredState();
+
+  // Update marker icon & opacity
+  markers.forEach(m => {
+    if (m._itemDetailNo === detailNo) {
+      m.setIcon(isChecked ? deliveredIcon : defaultIcon);
+      m.setOpacity(isChecked ? 0.5 : 1);
+    }
+  });
+
+  // Update card style
+  const card = document.querySelector(`.item-card[data-detail-no="${detailNo}"]`);
+  if (card) {
+    card.classList.toggle('delivered', isChecked);
+  }
+
+  // Sync all checkboxes with the same detailNo (popup + card)
+  document.querySelectorAll(`input[onchange*="'${detailNo}'"]`).forEach(cb => {
+    cb.checked = isChecked;
+  });
 }
 
 // ==================== Service Worker ====================

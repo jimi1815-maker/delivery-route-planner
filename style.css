@@ -307,3 +307,60 @@ body {
   white-space: nowrap;
   transition: opacity 0.3s;
 }
+
+/* ==================== Delivered State ==================== */
+.item-card.delivered {
+  opacity: 0.45;
+  background: rgba(17, 24, 39, 0.5);
+  border-color: rgba(100, 116, 139, 0.15);
+}
+.item-card.delivered .receiver-name {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+.item-card.delivered .card-address {
+  text-decoration: line-through;
+}
+
+/* Card checkbox */
+.card-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+.card-check input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--success);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* Popup checkbox */
+.popup-delivered-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+  padding: 0.5rem 0.6rem;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+}
+.popup-delivered-check:hover {
+  background: rgba(16, 185, 129, 0.15);
+}
+.popup-delivered-check input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--success);
+  cursor: pointer;
+}
+.popup-delivered-check .check-label {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  font-weight: 500;
+}
