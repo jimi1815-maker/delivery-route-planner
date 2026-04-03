@@ -1,0 +1,22 @@
+{
+  "name": "路線規劃",
+  "short_name": "路線規劃",
+  "description": "每日送貨路線規劃工具",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0a0e17",
+  "theme_color": "#0a0e17",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

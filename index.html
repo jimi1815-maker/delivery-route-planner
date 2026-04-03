@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="路線規劃">
+  <meta name="theme-color" content="#0a0e17">
+  <meta name="description" content="每日送貨路線規劃工具 - 上傳CSV、地圖標點、Google Maps導航">
+  <title>路線規劃</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ============ Upload Screen ============ -->
+  <div id="upload-screen">
+    <div class="upload-container">
+      <div class="app-logo">🚚</div>
+      <h1>路線規劃</h1>
+      <p class="subtitle">上傳每日送貨 CSV 開始配送</p>
+      <div id="drop-zone">
+        <div class="drop-icon">📂</div>
+        <p>點擊上傳或拖曳 CSV 檔案</p>
+        <input type="file" id="csv-input" accept=".csv">
+      </div>
+      <button id="upload-settings-btn" class="settings-link">⚙️ 設定 API Key</button>
+    </div>
+  </div>
+
+  <!-- ============ Main Screen ============ -->
+  <div id="main-screen" class="hidden">
+    <!-- Top Bar -->
+    <header id="top-bar">
+      <div class="header-left">
+        <span class="logo-small">🚚</span>
+        <h2>路線規劃</h2>
+      </div>
+      <div class="header-right">
+        <button id="settings-btn" title="設定">⚙️</button>
+        <button id="re-upload-btn" title="重新上傳">📂</button>
+      </div>
+    </header>
+
+    <!-- Filter Bar -->
+    <div id="filter-bar">
+      <select id="district-select">
+        <option value="">選擇配區</option>
+      </select>
+      <span id="item-count"></span>
+    </div>
+
+    <!-- Tab Bar -->
+    <div id="tab-bar">
+      <button class="tab-btn active" data-tab="map">🗺️ 地圖</button>
+      <button class="tab-btn" data-tab="list">📋 清單</button>
+    </div>
+
+    <!-- Content Area -->
+    <div id="content-area">
+      <div id="map-view">
+        <div id="map"></div>
+      </div>
+      <div id="list-view" class="hidden">
+        <div id="item-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Loading Overlay ============ -->
+  <div id="loading-overlay" class="hidden">
+    <div class="loading-spinner"></div>
+    <p id="loading-text">正在定位地址...</p>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+  </div>
+
+  <!-- ============ Geocode Toast ============ -->
+  <div id="geocode-toast" class="hidden"></div>
+
+  <!-- ============ Settings Modal ============ -->
+  <div id="settings-modal" class="hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <h3>⚙️ 設定</h3>
+      <label for="api-key-input">Google Maps API Key</label>
+      <input type="password" id="api-key-input" placeholder="貼上你的 API Key">
+      <p class="hint">Key 只儲存在你的瀏覽器中，不會上傳到任何地方。</p>
+      <div class="modal-actions">
+        <button id="save-key-btn" class="btn-primary">儲存</button>
+        <button id="close-modal-btn" class="btn-secondary">取消</button>
+      </div>
+      <div id="api-key-status"></div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
