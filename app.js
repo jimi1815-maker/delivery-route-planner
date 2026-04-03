@@ -354,7 +354,7 @@ async function filterByDistrict(district) {
       try {
         const addrForSearch = cleanAddressForGeo(item.addressRaw);
         console.log(`[Geocode] 搜尋: "${addrForSearch}"`);
-        const result = await geocodeAddress(addrForSearch);
+        const result = await geocodeAddress(item.addressRaw, addrForSearch);
         if (result) {
           item.lat = result.lat;
           item.lng = result.lng;
@@ -456,14 +456,14 @@ function saveGeocodeCache() {
 }
 
 // ==================== Geocoding (Google Maps) ====================
-async function geocodeAddress(address) {
-  // Check cache first
-  if (geocodeCache[address]) {
-    console.log(`[Geocode] 📦 快取命中: "${address}"`);
-    return geocodeCache[address];
+async function geocodeAddress(rawAddress, cleanedAddress) {
+  // Use raw address as cache key
+  if (geocodeCache[rawAddress]) {
+    console.log(`[Geocode] 📦 快取命中: "${rawAddress}"`);
+    return geocodeCache[rawAddress];
   }
 
-  console.log(`[Geocode] 🔍 快取未命中，呼叫 API: "${address}"`);
+  console.log(`[Geocode] 🔍 快取未命中，呼叫 API: "${cleanedAddress}"`);
 
   const apiKey = getApiKey();
   if (!apiKey) {
@@ -471,7 +471,7 @@ async function geocodeAddress(address) {
     return null;
   }
 
-  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}&language=zh-TW&region=tw`;
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(cleanedAddress)}&key=${apiKey}&language=zh-TW&region=tw`;
 
   try {
     const res = await fetch(url);
@@ -481,10 +481,10 @@ async function geocodeAddress(address) {
     if (data.status === 'OK' && data.results.length > 0) {
       const loc = data.results[0].geometry.location;
       const result = { lat: loc.lat, lng: loc.lng };
-      // Save to cache
-      geocodeCache[address] = result;
+      // Save to cache with raw address as key
+      geocodeCache[rawAddress] = result;
       saveGeocodeCache();
-      console.log(`[Geocode] 💾 已存入快取: "${address}"`);
+      console.log(`[Geocode] 💾 已存入快取: "${rawAddress}"`);
       return result;
     }
 
@@ -493,7 +493,7 @@ async function geocodeAddress(address) {
     }
     return null;
   } catch (e) {
-    console.error(`[Geocode] 錯誤: ${address}`, e);
+    console.error(`[Geocode] 錯誤: ${cleanedAddress}`, e);
     return null;
   }
 }
