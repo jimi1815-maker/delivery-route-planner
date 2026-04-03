@@ -162,23 +162,13 @@ function clearMarkers() {
   markers = [];
 }
 
-function addMarker(item) {
-  if (!item.lat || !item.lng) return;
-
+function buildPopupHtml(item) {
   const isDelivered = deliveredSet.has(item.detailNo);
-  const marker = L.marker([item.lat, item.lng], {
-    icon: isDelivered ? deliveredIcon : defaultIcon,
-    opacity: isDelivered ? 0.5 : 1,
-  }).addTo(map);
-
-  // Store reference for later updates
-  marker._itemDetailNo = item.detailNo;
-
   const phone = item.phone.replace(/\s+/g, '');
   const encodedAddr = encodeURIComponent(item.addressRaw);
   const navUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodedAddr}`;
 
-  const popupHtml = `
+  return `
     <div class="popup-content">
       <h3>${escHtml(item.receiverName)}</h3>
       <div class="popup-row"><span class="popup-label">單號</span><span class="popup-value">${escHtml(item.detailNo)}</span></div>
@@ -193,8 +183,29 @@ function addMarker(item) {
       </label>
       <a class="navigate-btn" href="${navUrl}" target="_blank" rel="noopener">🧭 Google Maps 導航</a>
     </div>`;
+}
 
-  marker.bindPopup(popupHtml, { maxWidth: 300, className: '' });
+function addMarker(item) {
+  if (!item.lat || !item.lng) return;
+
+  const isDelivered = deliveredSet.has(item.detailNo);
+  const marker = L.marker([item.lat, item.lng], {
+    icon: isDelivered ? deliveredIcon : defaultIcon,
+    opacity: isDelivered ? 0.5 : 1,
+  }).addTo(map);
+
+  // Store reference for later updates
+  marker._itemDetailNo = item.detailNo;
+  marker._itemData = item;
+
+  // Bind popup with initial content
+  marker.bindPopup(buildPopupHtml(item), { maxWidth: 300, className: '' });
+
+  // Refresh popup content every time it opens (so checkbox is always current)
+  marker.on('popupopen', () => {
+    marker.setPopupContent(buildPopupHtml(item));
+  });
+
   markers.push(marker);
   return marker;
 }
