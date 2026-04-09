@@ -1,14 +1,15 @@
 /* =====================================================
-   csv.js — CSV 檔案處理與解析
+   csv.js — CSV 檔案處理與解析 (支援一般 + 留庫格式)
    ===================================================== */
 
 // ==================== CSV Parsing (CSV 解析) ====================
 /**
  * 簡易 CSV 解析: 跳過 header (line 0)，以逗號分割
  * 注意: 不處理引號內的逗號，適用於特定的簡單 CSV 格式
- * 欄位數 < 20 的行視為無效資料跳過
+ * @param {string} text - CSV 文字內容
+ * @param {number} minCols - 最小欄位數，少於此數的行視為無效跳過
  */
-function parseCSV(text) {
+function parseCSV(text, minCols) {
   const lines = text.split(/\r?\n/);
   const rows = [];
 
@@ -16,7 +17,7 @@ function parseCSV(text) {
     const line = lines[i].trim();
     if (!line) continue;
     const cols = line.split(',');
-    if (cols.length < 20) continue; // Skip invalid rows
+    if (cols.length < minCols) continue; // Skip invalid rows
     rows.push(cols);
   }
 
@@ -46,7 +47,7 @@ async function readFileWithEncoding(file) {
   let text = new TextDecoder('utf-8').decode(buffer);
 
   // If it has replacement characters or missing key headers, try Big5
-  if (text.includes('\uFFFD') || (!text.includes('日期') && !text.includes('地址') && !text.includes('配區'))) {
+  if (text.includes('\uFFFD') || (!text.includes('日期') && !text.includes('地址') && !text.includes('配區') && !text.includes('貨號'))) {
     try {
       text = new TextDecoder('big5').decode(buffer);
     } catch (e) {
@@ -60,50 +61,164 @@ async function readFileWithEncoding(file) {
   return text;
 }
 
+// ==================== CSV Type Detection (類型自動偵測) ====================
 /**
- * 處理上傳的 CSV 檔案
- * 1. 偵測編碼 (UTF-8 / Big5)
- * 2. 解析 CSV 行
- * 3. 提取不重複的配區列表填入下拉選單
- * 4. 切換到主畫面
+ * 根據 CSV header 行自動偵測類型
+ * @param {string} headerLine - CSV 第一行 (header)
+ * @returns {'general'|'retention'|'error'}
  */
-async function handleFile(file) {
-  const { csvData, districtSelect, uploadScreen, mainScreen, map, COL } = window.App;
+function detectCsvType(headerLine) {
+  if (headerLine.includes('系統配區') && headerLine.includes('明細單號')) {
+    return 'general';
+  }
+  if (headerLine.includes('貨號') && headerLine.includes('托運人')) {
+    return 'retention';
+  }
+  return 'error';
+}
+
+// ==================== Row Parsers (行資料解析) ====================
+/**
+ * 解析一般 CSV 的一行資料為標準 item 物件
+ */
+function parseGeneralRow(row, idx, sourceId) {
+  const { COL, cleanAddress } = window.App;
+  return {
+    id: `${sourceId}-${idx}`,
+    sourceId,
+    detailNo: cleanVal(row[COL.DETAIL_NO]),
+    receiverName: cleanVal(row[COL.RECEIVER_NAME]),
+    phone: cleanVal(row[COL.RECEIVER_PHONE]),
+    addressRaw: cleanAddress(cleanVal(row[COL.RECEIVER_ADDR])),
+    remark: cleanVal(row[COL.REMARK]),
+    shipperName: cleanVal(row[COL.SHIPPER_NAME]),
+    tempZone: '',
+    latestStatus: '',
+    type: 'general',
+    lat: null,
+    lng: null,
+    geocodeStatus: 'pending',
+  };
+}
+
+/**
+ * 解析留庫 CSV 的一行資料為標準 item 物件
+ * 電話欄位: 留庫 CSV 無電話欄，固定 N/A
+ */
+function parseRetentionRow(row, idx, sourceId) {
+  const { COL_PREV, cleanAddress } = window.App;
+  return {
+    id: `${sourceId}-${idx}`,
+    sourceId,
+    detailNo: cleanVal(row[COL_PREV.DETAIL_NO]),
+    receiverName: cleanVal(row[COL_PREV.RECEIVER_NAME]),
+    phone: 'N/A',
+    addressRaw: cleanAddress(cleanVal(row[COL_PREV.RECEIVER_ADDR])),
+    remark: '',
+    shipperName: cleanVal(row[COL_PREV.SHIPPER_NAME]),
+    tempZone: cleanVal(row[COL_PREV.TEMP_ZONE]),
+    latestStatus: cleanVal(row[COL_PREV.LATEST_STATUS]),
+    type: 'retention',
+    lat: null,
+    lng: null,
+    geocodeStatus: 'pending',
+  };
+}
+
+// ==================== File Upload Handler ====================
+/**
+ * 處理上傳的 CSV 檔案 — 多來源版
+ * 1. 偵測編碼 (UTF-8 / Big5)
+ * 2. 偵測 CSV 類型 (一般 / 留庫)
+ * 3. 解析 CSV 行
+ * 4. 提取配區列表
+ * 5. 建立 csvSource 物件 push 到 csvSources
+ * 6. 更新 UI
+ */
+async function handleFileUpload(file) {
+  const { csvSources, COLOR_PALETTE, COL, COL_PREV } = window.App;
 
   try {
     const text = await readFileWithEncoding(file);
-    const parsed = parseCSV(text);
-    window.App.csvData = parsed;
+    const lines = text.split(/\r?\n/);
 
-    if (parsed.length === 0) {
-      alert('CSV 檔案沒有有效資料');
+    if (lines.length < 2) {
+      _addErrorSource(file.name, 'CSV 無內容');
       return;
     }
 
-    // Extract unique districts
-    const districts = [...new Set(
-      parsed.map(row => cleanVal(row[COL.SYS_DISTRICT])).filter(d => d.trim().length > 0)
+    const headerLine = lines[0];
+    const csvType = detectCsvType(headerLine);
+
+    // Pick next color from palette
+    const colorIdx = csvSources.length % COLOR_PALETTE.length;
+    const color = COLOR_PALETTE[colorIdx];
+
+    const sourceId = crypto.randomUUID ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    if (csvType === 'error') {
+      _addErrorSource(file.name, '無法辨識 CSV 格式');
+      return;
+    }
+
+    // Parse rows with appropriate min columns
+    const minCols = csvType === 'general' ? 20 : 15;
+    const rows = parseCSV(text, minCols);
+
+    if (rows.length === 0) {
+      _addErrorSource(file.name, 'CSV 沒有有效資料');
+      return;
+    }
+
+    // Extract districts
+    const districtCol = csvType === 'general' ? COL.SYS_DISTRICT : COL_PREV.DISTRICT;
+    const allDistricts = [...new Set(
+      rows.map(row => cleanVal(row[districtCol])).filter(d => d.trim().length > 0)
     )].sort();
 
-    districtSelect.innerHTML = '<option value="">選擇配區</option>';
-    districts.forEach(d => {
-      const opt = document.createElement('option');
-      opt.value = d;
-      opt.textContent = d;
-      districtSelect.appendChild(opt);
-    });
+    const source = {
+      id: sourceId,
+      fileName: file.name,
+      type: csvType,
+      color,
+      selectedDistricts: [],
+      allDistricts,
+      rawRows: rows,
+    };
 
-    // Switch to main screen
-    uploadScreen.classList.add('hidden');
-    mainScreen.classList.remove('hidden');
-    if (map) setTimeout(() => map.invalidateSize(), 100);
+    csvSources.push(source);
+    window.App.renderCsvSourceList();
 
   } catch (err) {
     console.error(err);
-    alert('讀取 CSV 檔案失敗: ' + err.message);
+    _addErrorSource(file.name, err.message);
   }
+}
+
+/** 建立解析失敗的 error source 物件 */
+function _addErrorSource(fileName, errorMsg) {
+  const { csvSources, COLOR_PALETTE } = window.App;
+  const colorIdx = csvSources.length % COLOR_PALETTE.length;
+
+  csvSources.push({
+    id: `err-${Date.now()}`,
+    fileName,
+    type: 'error',
+    color: COLOR_PALETTE[colorIdx],
+    selectedDistricts: [],
+    allDistricts: [],
+    rawRows: [],
+    errorMsg,
+  });
+
+  window.App.renderCsvSourceList();
+  window.App.showToast(`❌ ${fileName}: ${errorMsg}`);
 }
 
 // ==================== 匯出到全域命名空間 ====================
 window.App = window.App || {};
-Object.assign(window.App, { parseCSV, cleanVal, readFileWithEncoding, handleFile });
+Object.assign(window.App, {
+  parseCSV, cleanVal, readFileWithEncoding, detectCsvType,
+  parseGeneralRow, parseRetentionRow, handleFileUpload,
+});

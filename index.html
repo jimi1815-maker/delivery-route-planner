@@ -22,43 +22,27 @@
 </head>
 <body>
 
-  <!-- ============ Upload Screen ============ -->
-  <!-- 首頁: CSV 檔案上傳區，支援拖曳與點擊上傳 -->
-  <div id="upload-screen">
-    <div class="upload-container">
-      <div class="app-logo">🚚</div>
-      <h1>路線規劃</h1>
-      <p class="subtitle">上傳每日送貨 CSV 開始配送</p>
-      <div id="drop-zone">
-        <div class="drop-icon">📂</div>
-        <p>點擊上傳或拖曳 CSV 檔案</p>
-        <input type="file" id="csv-input" accept=".csv">
-      </div>
-      <button id="upload-settings-btn" class="settings-link">⚙️ 設定 API Key</button>
-    </div>
-  </div>
-
-  <!-- ============ Main Screen ============ -->
-  <!-- 主畫面: 上傳 CSV 後顯示，包含 Header / 配區篩選 / Tab 切換 / 地圖+清單 -->
-  <div id="main-screen" class="hidden">
-    <!-- Top Bar: 應用標題 + 設定/重新上傳按鈕 -->
+  <!-- ============ Main Screen (直接顯示) ============ -->
+  <!-- 主畫面: 包含 Header / CSV 來源管理 / Tab 切換 / 地圖+清單 -->
+  <div id="main-screen">
+    <!-- Top Bar: 應用標題 + 設定按鈕 -->
     <header id="top-bar">
       <div class="header-left">
         <span class="logo-small">🚚</span>
         <h2>路線規劃</h2>
       </div>
       <div class="header-right">
+        <span id="item-count"></span>
         <button id="settings-btn" title="設定">⚙️</button>
-        <button id="re-upload-btn" title="重新上傳">📂</button>
       </div>
     </header>
 
-    <!-- Filter Bar: 依配區篩選送貨資料 -->
-    <div id="filter-bar">
-      <select id="district-select">
-        <option value="">選擇配區</option>
-      </select>
-      <span id="item-count"></span>
+    <!-- CSV Source Bar: 多 CSV 來源管理區 -->
+    <div id="csv-source-bar">
+      <div id="csv-source-list">
+        <!-- 動態渲染: CSV 來源列表 + ➕ 新增按鈕 -->
+      </div>
+      <input type="file" id="csv-add-input" accept=".csv" class="hidden">
     </div>
 
     <!-- Tab Bar: 地圖 / 清單 雙頁面切換 -->
@@ -110,13 +94,13 @@
   <!-- 外部依賴: Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <!-- 應用邏輯: 依功能拆分為獨立模組，按依賴順序載入 -->
-  <script src="js/constants.js"></script>   <!-- 常數定義: CSV 欄位索引、地圖圖示 -->
-  <script src="js/csv.js"></script>         <!-- CSV 檔案處理: 編碼偵測、解析 -->
+  <script src="js/constants.js"></script>   <!-- 常數定義: CSV 欄位索引、DivIcon、色盤 -->
+  <script src="js/csv.js"></script>         <!-- CSV 檔案處理: 編碼偵測、類型偵測、解析 -->
   <script src="js/geocoding.js"></script>   <!-- 地址轉經緯度: API 呼叫、快取、地址清理 -->
   <script src="js/map.js"></script>         <!-- Leaflet 地圖: 初始化、標記管理 -->
   <script src="js/delivered.js"></script>   <!-- 送達狀態: 每日重置、localStorage 同步 -->
   <script src="js/settings.js"></script>    <!-- API Key 管理: 設定彈窗 -->
-  <script src="js/ui.js"></script>          <!-- UI 互動: 渲染、事件綁定、Tab 切換 -->
+  <script src="js/ui.js"></script>          <!-- UI 互動: CSV 來源列表、多選配區、渲染 -->
   <script src="app.js"></script>            <!-- 進入點: 狀態初始化、DOM 參照、啟動流程 -->
 </body>
 </html>

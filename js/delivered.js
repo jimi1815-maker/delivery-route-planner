@@ -45,12 +45,12 @@ function saveDeliveredState() {
  * 同步更新:
  * 1. deliveredSet 集合
  * 2. localStorage 持久化
- * 3. 地圖 marker 圖示 & 透明度
+ * 3. 地圖 marker 圖示 (DivIcon) & 透明度
  * 4. 清單卡片樣式 (opacity + 刪除線)
  * 5. 同一 detailNo 的所有 checkbox (地圖 popup + 清單卡片)
  */
 function toggleDelivered(detailNo, isChecked) {
-  const { deliveredSet, markers, defaultIcon, deliveredIcon } = window.App;
+  const { deliveredSet, markers, createMarkerIcon } = window.App;
 
   if (isChecked) {
     deliveredSet.add(detailNo);
@@ -59,11 +59,10 @@ function toggleDelivered(detailNo, isChecked) {
   }
   saveDeliveredState();
 
-  // Update marker icon & opacity
+  // Update marker icon (DivIcon with source color)
   markers.forEach(m => {
     if (m._itemDetailNo === detailNo) {
-      m.setIcon(isChecked ? deliveredIcon : defaultIcon);
-      m.setOpacity(isChecked ? 0.5 : 1);
+      m.setIcon(createMarkerIcon(m._sourceColor, isChecked));
     }
   });
 

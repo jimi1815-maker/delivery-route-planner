@@ -30,7 +30,8 @@ function clearMarkers() {
 
 /**
  * 產生地圖標記的彈出視窗 HTML
- * 包含: 收貨人、單號、地址、電話(可撥打)、備註、托運人、送達 checkbox、Google Maps 導航按鈕
+ * 一般項目: 收貨人、單號、地址、電話(可撥打)、備註、托運人
+ * 留庫項目: 額外顯示溫層、最新貨況；電話顯示 N/A
  */
 function buildPopupHtml(item) {
   const { deliveredSet, escHtml } = window.App;
@@ -39,14 +40,29 @@ function buildPopupHtml(item) {
   const encodedAddr = encodeURIComponent(item.addressRaw);
   const navUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodedAddr}`;
 
+  // Phone display: link if valid, plain text if N/A
+  const phoneHtml = item.phone === 'N/A'
+    ? `<span class="popup-value">N/A</span>`
+    : `<span class="popup-value"><a href="tel:${phone}">${escHtml(item.phone)}</a></span>`;
+
+  // Retention-specific rows
+  let extraRows = '';
+  if (item.type === 'retention') {
+    extraRows = `
+      <div class="popup-row"><span class="popup-label">溫層</span><span class="popup-value">${escHtml(item.tempZone)}</span></div>
+      <div class="popup-row"><span class="popup-label">貨況</span><span class="popup-value">${escHtml(item.latestStatus)}</span></div>
+    `;
+  }
+
   return `
     <div class="popup-content">
       <h3>${escHtml(item.receiverName)}</h3>
       <div class="popup-row"><span class="popup-label">單號</span><span class="popup-value">${escHtml(item.detailNo)}</span></div>
       <div class="popup-row"><span class="popup-label">地址</span><span class="popup-value">${escHtml(item.addressRaw)}</span></div>
-      <div class="popup-row"><span class="popup-label">電話</span><span class="popup-value"><a href="tel:${phone}">${escHtml(item.phone)}</a></span></div>
-      <div class="popup-row"><span class="popup-label">備註</span><span class="popup-value">${escHtml(item.remark || '無')}</span></div>
+      <div class="popup-row"><span class="popup-label">電話</span>${phoneHtml}</div>
+      ${item.remark ? `<div class="popup-row"><span class="popup-label">備註</span><span class="popup-value">${escHtml(item.remark)}</span></div>` : ''}
       <div class="popup-row"><span class="popup-label">托運</span><span class="popup-value">${escHtml(item.shipperName)}</span></div>
+      ${extraRows}
       <label class="popup-delivered-check" onclick="event.stopPropagation()">
         <input type="checkbox" ${isDelivered ? 'checked' : ''}
                onchange="toggleDelivered('${escHtml(item.detailNo)}', this.checked)" />
@@ -57,23 +73,23 @@ function buildPopupHtml(item) {
 }
 
 /**
- * 在地圖上新增一個 marker
- * - 已送達的點使用灰色圖示 + 降低透明度
- * - 每次打開 popup 會重新繪製 HTML，確保 checkbox 狀態最新
+ * 在地圖上新增一個 marker (多來源版)
+ * @param {Object} item - 標準 item 物件
+ * @param {string} color - 來源顏色 (hex)
  */
-function addMarker(item) {
+function addMarker(item, color) {
   if (!item.lat || !item.lng) return;
 
-  const { map, markers, deliveredSet, defaultIcon, deliveredIcon } = window.App;
+  const { map, markers, deliveredSet, createMarkerIcon } = window.App;
   const isDelivered = deliveredSet.has(item.detailNo);
   const marker = L.marker([item.lat, item.lng], {
-    icon: isDelivered ? deliveredIcon : defaultIcon,
-    opacity: isDelivered ? 0.5 : 1,
+    icon: createMarkerIcon(color, isDelivered),
   }).addTo(map);
 
   // Store reference for later updates
   marker._itemDetailNo = item.detailNo;
   marker._itemData = item;
+  marker._sourceColor = color;
 
   // Bind popup with initial content
   marker.bindPopup(buildPopupHtml(item), { maxWidth: 300, className: '' });

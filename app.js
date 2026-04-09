@@ -12,8 +12,8 @@
 // ==================== State (應用狀態) ====================
 window.App = window.App || {};
 Object.assign(window.App, {
-  csvData: [],          // 全部 CSV 解析後的原始行資料
-  filteredItems: [],    // 經配區篩選後的送貨項目清單
+  csvSources: [],       // 多 CSV 來源陣列 (每個元素含 rawRows, type, color, selectedDistricts 等)
+  filteredItems: [],    // 經配區篩選後的所有送貨項目 (合併多 CSV 來源)
   map: null,            // Leaflet 地圖實例
   markers: [],          // 目前地圖上的所有 Leaflet marker
   deliveredSet: new Set(), // 已送達的明細單號 (detailNo) 集合
@@ -25,17 +25,14 @@ const $ = (sel) => document.querySelector(sel);
 
 Object.assign(window.App, {
   $,
-  uploadScreen: $('#upload-screen'),
   mainScreen: $('#main-screen'),
-  csvInput: $('#csv-input'),
-  dropZone: $('#drop-zone'),
-  districtSelect: $('#district-select'),
+  csvSourceList: $('#csv-source-list'),
+  csvAddInput: $('#csv-add-input'),
   itemCount: $('#item-count'),
   itemList: $('#item-list'),
   loadingOverlay: $('#loading-overlay'),
   loadingText: $('#loading-text'),
   progressFill: $('#progress-fill'),
-  reUploadBtn: $('#re-upload-btn'),
   geocodeToast: $('#geocode-toast'),
   settingsBtn: $('#settings-btn'),
   settingsModal: $('#settings-modal'),
@@ -53,6 +50,7 @@ Object.assign(window.App, {
  * 3. 綁定所有事件監聽器
  * 4. 初始化 Leaflet 地圖
  * 5. 檢查是否已設定 API Key
+ * 6. 渲染空的 CSV 來源列表
  */
 document.addEventListener('DOMContentLoaded', () => {
   window.App.loadDeliveredState();
@@ -60,6 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.App.initEventListeners();
   window.App.initMap();
   window.App.checkApiKey();
+  window.App.renderCsvSourceList();
 });
 
 // ==================== Service Worker 註冊 ====================
