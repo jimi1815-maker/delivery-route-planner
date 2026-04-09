@@ -12,11 +12,13 @@
 // ==================== State (應用狀態) ====================
 window.App = window.App || {};
 Object.assign(window.App, {
-  csvSources: [],       // 多 CSV 來源陣列 (每個元素含 rawRows, type, color, selectedDistricts 等)
-  filteredItems: [],    // 經配區篩選後的所有送貨項目 (合併多 CSV 來源)
-  map: null,            // Leaflet 地圖實例
-  markers: [],          // 目前地圖上的所有 Leaflet marker
-  deliveredSet: new Set(), // 已送達的明細單號 (detailNo) 集合
+  csvSources: [],           // 多 CSV 來源陣列
+  filteredItems: [],        // 經配區篩選後的所有送貨項目
+  map: null,                // Leaflet 地圖實例
+  markers: [],              // 向後相容 (deprecated, 請用 markerGroups)
+  markerGroups: new Map(),  // 座標分組: Map<coordKey, {marker, items[]}>
+  deliveredSet: new Set(),  // 已送達的明細單號集合
+  highlightedTempZones: new Set(), // 溫層篩選高亮 Set (e.g. Set(['凍', '藏']))
 });
 
 // ==================== DOM References (元素參照) ====================
@@ -30,7 +32,7 @@ Object.assign(window.App, {
   csvAddInput: $('#csv-add-input'),
   itemCount: $('#item-count'),
   itemList: $('#item-list'),
-  loadingOverlay: $('#loading-overlay'),
+  geocodeProgress: $('#geocode-progress'),
   loadingText: $('#loading-text'),
   progressFill: $('#progress-fill'),
   geocodeToast: $('#geocode-toast'),
@@ -65,6 +67,6 @@ document.addEventListener('DOMContentLoaded', () => {
 /** 註冊 Service Worker 以啟用離線快取 */
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
+    navigator.serviceWorker.register('./sw.js').catch(() => { });
   });
 }

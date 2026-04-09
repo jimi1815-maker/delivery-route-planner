@@ -12,24 +12,24 @@ function escHtml(str) {
   return div.innerHTML;
 }
 
-/** 顯示全螢幕 Loading 遮罩 */
+/** 顯示內嵌式 Geocoding 進度條 (非阻塞) */
 function showLoading(text) {
-  const { loadingText, progressFill, loadingOverlay } = window.App;
+  const { loadingText, progressFill, geocodeProgress } = window.App;
   loadingText.textContent = text;
   progressFill.style.width = '0%';
-  loadingOverlay.classList.remove('hidden');
+  geocodeProgress.classList.remove('hidden');
 }
 
 function hideLoading() {
-  window.App.loadingOverlay.classList.add('hidden');
+  window.App.geocodeProgress.classList.add('hidden');
 }
 
-/** 更新 Loading 進度條和文字 */
+/** 更新進度條寬度和文字 */
 function updateProgress(completed, total) {
   const { progressFill, loadingText } = window.App;
   const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
   progressFill.style.width = `${pct}%`;
-  loadingText.textContent = `正在定位地址 ${completed}/${total}...`;
+  loadingText.textContent = `定位中 ${completed}/${total}`;
 }
 
 /** 顯示底部浮動通知 (自動 4 秒後消失) */
@@ -84,7 +84,7 @@ function renderCsvSourceList() {
     const typeBadge = document.createElement('span');
     typeBadge.className = `csv-type-badge csv-type-${source.type}`;
     typeBadge.textContent = source.type === 'general' ? '一般' :
-                            source.type === 'retention' ? '留庫' : '錯誤';
+      source.type === 'retention' ? '留庫' : '錯誤';
 
     // Color dropdown
     const colorSelect = _createColorDropdown(source, COLOR_PALETTE);
@@ -376,9 +376,11 @@ function onClearAll(source) {
 
 /** 檢查某 source+district 是否已有 markers 在地圖上 */
 function _districtHasMarkers(sourceId, district) {
-  return window.App.markers.some(m =>
-    m._itemData.sourceId === sourceId && m._itemData.district === district
-  );
+  const { markerGroups } = window.App;
+  for (const group of markerGroups.values()) {
+    if (group.items.some(i => i.sourceId === sourceId && i.district === district)) return true;
+  }
+  return false;
 }
 
 /**
@@ -504,7 +506,7 @@ function syncListAndCount() {
  * - 若地址未定位成功: 直接開啟 Google Maps
  */
 function renderList() {
-  const { filteredItems, deliveredSet, markers, map, itemList } = window.App;
+  const { filteredItems, deliveredSet, map, itemList } = window.App;
   itemList.innerHTML = '';
 
   filteredItems.forEach((item, index) => {
@@ -552,10 +554,7 @@ function renderList() {
       if (item.lat && item.lng) {
         switchTab('map');
         map.setView([item.lat, item.lng], 17);
-        const marker = markers.find(m => {
-          const pos = m.getLatLng();
-          return Math.abs(pos.lat - item.lat) < 0.0001 && Math.abs(pos.lng - item.lng) < 0.0001;
-        });
+        const marker = window.App.findMarkerForItem(item);
         if (marker) marker.openPopup();
       } else {
         // No geocode, open Google Maps directly
@@ -618,6 +617,16 @@ function initEventListeners() {
   });
 }
 
+// ==================== 溫層篩選控制 ====================
+/** 溫層 checkbox 變化 → 高亮/縮回 markers */
+function onTempZoneFilterChange() {
+  const zones = window.App.highlightedTempZones;
+  zones.clear();
+  if (document.getElementById('tz-frozen').checked) zones.add('凍');
+  if (document.getElementById('tz-chilled').checked) zones.add('藏');
+  window.App.highlightTempZones(zones);
+}
+
 // ==================== 匯出到全域命名空間 ====================
 window.App = window.App || {};
 Object.assign(window.App, {
@@ -625,4 +634,5 @@ Object.assign(window.App, {
   switchTab, renderCsvSourceList, syncListAndCount,
   onDistrictToggled, onSelectAll, onClearAll, onColorChanged,
   renderList, updateCardStatus, initEventListeners,
+  onTempZoneFilterChange,
 });

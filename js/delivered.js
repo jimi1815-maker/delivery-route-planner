@@ -50,7 +50,7 @@ function saveDeliveredState() {
  * 5. 同一 detailNo 的所有 checkbox (地圖 popup + 清單卡片)
  */
 function toggleDelivered(detailNo, isChecked) {
-  const { deliveredSet, markers, createMarkerIcon } = window.App;
+  const { deliveredSet } = window.App;
 
   if (isChecked) {
     deliveredSet.add(detailNo);
@@ -59,10 +59,14 @@ function toggleDelivered(detailNo, isChecked) {
   }
   saveDeliveredState();
 
-  // Update marker icon (DivIcon with source color)
-  markers.forEach(m => {
-    if (m._itemDetailNo === detailNo) {
-      m.setIcon(createMarkerIcon(m._sourceColor, isChecked));
+  // Update marker icon via markerGroups
+  const { markerGroups, createMarkerIcon: _createIcon } = window.App;
+  markerGroups.forEach(group => {
+    if (group.items.some(i => i.detailNo === detailNo)) {
+      const primary = group.items.find(i => i.type === 'retention') || group.items[0];
+      const color = primary._sourceColor || '#3b82f6';
+      const allDelivered = group.items.every(i => deliveredSet.has(i.detailNo));
+      group.marker.setIcon(_createIcon(color, allDelivered, primary.tempZone));
     }
   });
 

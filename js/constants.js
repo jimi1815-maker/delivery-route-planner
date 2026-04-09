@@ -47,22 +47,41 @@ const COLOR_PALETTE = [
  * 產生 DivIcon 水滴形 Marker
  * @param {string} color - 十六進位色碼 (如 '#3b82f6')
  * @param {boolean} isDelivered - 是否已送達 (降低透明度 + 灰色遮罩)
+ * @param {string} [tempZone] - 溫層 ('冷凍'/'冷藏'，留庫專用)
+ * @param {boolean} [enlarged] - 是否放大 (溫層篩選高亮用)
  * @returns {L.DivIcon}
  */
-function createMarkerIcon(color, isDelivered) {
+function createMarkerIcon(color, isDelivered, tempZone, enlarged) {
   const opacity = isDelivered ? 0.4 : 1;
   const filter = isDelivered ? 'saturate(0.3)' : 'none';
 
+  // 根據溫層決定中心圓點的內容與樣式
+  let dotClass = 'marker-dot';
+  let dotContent = '';
+  if (tempZone && tempZone.includes('凍')) {
+    dotClass += ' marker-dot-temp';
+    dotContent = '凍';
+  } else if (tempZone && tempZone.includes('藏')) {
+    dotClass += ' marker-dot-temp';
+    dotContent = '藏';
+  }
+
+  // 放大模式
+  const pinClass = enlarged ? 'marker-pin marker-pin-enlarged' : 'marker-pin';
+  const size = enlarged ? [36, 52] : [28, 40];
+  const anchor = enlarged ? [18, 52] : [14, 40];
+  const popupAnchor = enlarged ? [0, -54] : [0, -42];
+
   return L.divIcon({
     className: 'marker-pin-wrapper',
-    html: `<div class="marker-pin" style="
+    html: `<div class="${pinClass}" style="
       background-color: ${color};
       opacity: ${opacity};
       filter: ${filter};
-    "><div class="marker-dot"></div></div>`,
-    iconSize: [28, 40],
-    iconAnchor: [14, 40],
-    popupAnchor: [0, -42],
+    "><div class="${dotClass}">${dotContent}</div></div>`,
+    iconSize: size,
+    iconAnchor: anchor,
+    popupAnchor: popupAnchor,
   });
 }
 

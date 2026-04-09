@@ -1,8 +1,10 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
+
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <!-- PWA: iOS Safari 全螢幕模式 -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -20,6 +22,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
 
   <!-- ============ Main Screen (直接顯示) ============ -->
@@ -53,21 +56,29 @@
 
     <!-- Content Area: 地圖 (Leaflet) 與清單 (卡片列表) -->
     <div id="content-area">
+      <!-- Geocoding 進度條 (非阻塞式，覆蓋在內容區頂端) -->
+      <div id="geocode-progress" class="hidden">
+        <div class="geocode-progress-fill" id="progress-fill"></div>
+        <span class="geocode-progress-text" id="loading-text"></span>
+      </div>
       <div id="map-view">
         <div id="map"></div>
+        <!-- 溫層篩選控制面板 (地圖右上角) -->
+        <div id="temp-zone-control">
+          <label class="tz-option">
+            <input type="checkbox" id="tz-frozen" onchange="window.App.onTempZoneFilterChange()">
+            <span>凍</span>
+          </label>
+          <label class="tz-option">
+            <input type="checkbox" id="tz-chilled" onchange="window.App.onTempZoneFilterChange()">
+            <span>藏</span>
+          </label>
+        </div>
       </div>
       <div id="list-view" class="hidden">
         <div id="item-list"></div>
       </div>
     </div>
-  </div>
-
-  <!-- ============ Loading Overlay ============ -->
-  <!-- Geocoding 進行中的全螢幕遮罩，含 spinner 和進度條 -->
-  <div id="loading-overlay" class="hidden">
-    <div class="loading-spinner"></div>
-    <p id="loading-text">正在定位地址...</p>
-    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
   </div>
 
   <!-- ============ Geocode Toast ============ -->
@@ -94,13 +105,14 @@
   <!-- 外部依賴: Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <!-- 應用邏輯: 依功能拆分為獨立模組，按依賴順序載入 -->
-  <script src="js/constants.js"></script>   <!-- 常數定義: CSV 欄位索引、DivIcon、色盤 -->
-  <script src="js/csv.js"></script>         <!-- CSV 檔案處理: 編碼偵測、類型偵測、解析 -->
-  <script src="js/geocoding.js"></script>   <!-- 地址轉經緯度: API 呼叫、快取、地址清理 -->
-  <script src="js/map.js"></script>         <!-- Leaflet 地圖: 初始化、標記管理 -->
-  <script src="js/delivered.js"></script>   <!-- 送達狀態: 每日重置、localStorage 同步 -->
-  <script src="js/settings.js"></script>    <!-- API Key 管理: 設定彈窗 -->
-  <script src="js/ui.js"></script>          <!-- UI 互動: CSV 來源列表、多選配區、渲染 -->
-  <script src="app.js"></script>            <!-- 進入點: 狀態初始化、DOM 參照、啟動流程 -->
+  <script src="js/constants.js"></script> <!-- 常數定義: CSV 欄位索引、DivIcon、色盤 -->
+  <script src="js/csv.js"></script> <!-- CSV 檔案處理: 編碼偵測、類型偵測、解析 -->
+  <script src="js/geocoding.js"></script> <!-- 地址轉經緯度: API 呼叫、快取、地址清理 -->
+  <script src="js/map.js"></script> <!-- Leaflet 地圖: 初始化、標記管理 -->
+  <script src="js/delivered.js"></script> <!-- 送達狀態: 每日重置、localStorage 同步 -->
+  <script src="js/settings.js"></script> <!-- API Key 管理: 設定彈窗 -->
+  <script src="js/ui.js"></script> <!-- UI 互動: CSV 來源列表、多選配區、渲染 -->
+  <script src="app.js"></script> <!-- 進入點: 狀態初始化、DOM 參照、啟動流程 -->
 </body>
+
 </html>
