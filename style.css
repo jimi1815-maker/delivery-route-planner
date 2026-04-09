@@ -1,4 +1,13 @@
-/* ==================== Custom Properties ==================== */
+/* =====================================================
+   路線規劃 APP — 樣式表
+   =====================================================
+   設計: 深色主題 (Dark Mode) + Glassmorphism 風格
+   字型: Noto Sans TC (Google Fonts)
+   佈局: Mobile-first，全螢幕 flex 布局
+   動畫: 卡片滑入、Logo 浮動、Spinner 旋轉
+   ===================================================== */
+
+/* ==================== Design Tokens (設計令牌) ==================== */
 :root {
   --bg-primary: #0a0e17;
   --bg-secondary: #111827;
@@ -20,6 +29,7 @@
   --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* 全域重置: 移除預設 margin/padding，使用 border-box，停用 iOS tap 高亮 */
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
 body {
@@ -34,7 +44,8 @@ body {
 
 .hidden { display: none !important; }
 
-/* ==================== Upload Screen ==================== */
+/* ==================== Upload Screen (上傳首頁) ==================== */
+/* 全螢幕置中佈局，搭配漸層背景與旋轉光暈動畫 */
 #upload-screen {
   min-height: 100vh;
   min-height: 100dvh;
@@ -100,7 +111,8 @@ body {
 }
 .settings-link:hover { border-color: var(--accent); color: var(--accent); }
 
-/* ==================== Main Screen ==================== */
+/* ==================== Main Screen (主畫面) ==================== */
+/* 垂直 flex 佈局: Header → Filter → Tabs → Content (地圖/清單) */
 #main-screen {
   height: 100vh; height: 100dvh;
   display: flex; flex-direction: column;
@@ -136,7 +148,7 @@ body {
 }
 #re-upload-btn:hover, #settings-btn:hover { background: var(--bg-card); border-color: var(--accent); }
 
-/* Settings Modal */
+/* Settings Modal (API Key 設定彈窗) */
 #settings-modal { position: fixed; inset: 0; z-index: 10000; display: flex; align-items: center; justify-content: center; }
 .modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
 .modal-content {
@@ -168,7 +180,7 @@ body {
 }
 #api-key-status { margin-top: 0.75rem; font-size: 0.82rem; }
 
-/* Filter Bar */
+/* Filter Bar (配區篩選列) */
 #filter-bar {
   display: flex; align-items: center; gap: 0.75rem;
   padding: 0.6rem 1rem;
@@ -192,7 +204,7 @@ body {
 
 #item-count { color: var(--accent); font-weight: 600; font-size: 0.85rem; white-space: nowrap; }
 
-/* Tab Bar */
+/* Tab Bar (地圖/清單 切換) */
 #tab-bar {
   display: flex; background: var(--bg-secondary);
   border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
@@ -207,7 +219,8 @@ body {
 }
 .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
 
-/* Content Area */
+/* Content Area (主要內容區: 地圖 & 清單) */
+/* 使用 absolute positioning 實現 tab 切換的頁面堆疊 */
 #content-area { flex: 1; position: relative; overflow: hidden; }
 
 #map-view, #list-view { position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
@@ -216,7 +229,7 @@ body {
 /* Map */
 #map { width: 100%; height: 100%; z-index: 1; }
 
-/* Leaflet popup */
+/* Leaflet Popup (地圖標記彈出視窗) — 覆寫 Leaflet 預設樣式以符合深色主題 */
 .leaflet-popup-content-wrapper {
   background: var(--bg-secondary) !important;
   color: var(--text-primary) !important;
@@ -244,7 +257,7 @@ body {
 }
 .navigate-btn:active { transform: scale(0.97); }
 
-/* List */
+/* List View (送貨清單卡片列表) */
 #item-list { padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; }
 
 .item-card {
@@ -263,6 +276,7 @@ body {
 .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; }
 .receiver-name { font-weight: 600; font-size: 0.95rem; }
 
+/* Geocode 狀態指示燈: pending(灰/脈衝) → located(綠) / failed(黃) */
 .geocode-dot {
   width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
   background: var(--text-muted);
@@ -276,7 +290,7 @@ body {
 .card-footer { display: flex; justify-content: space-between; align-items: center; font-size: 0.78rem; color: var(--text-muted); }
 .card-footer a { color: var(--accent); text-decoration: none; }
 
-/* Loading Overlay */
+/* Loading Overlay (地址定位中的全螢幕遮罩) */
 #loading-overlay {
   position: fixed; inset: 0;
   background: rgba(10,14,23,0.85);
@@ -297,7 +311,7 @@ body {
 .progress-bar { width: 200px; height: 4px; background: var(--border); border-radius: 2px; margin-top: 1rem; overflow: hidden; }
 .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-secondary)); border-radius: 2px; transition: width 0.2s; width: 0%; }
 
-/* Geocoding toast */
+/* Geocoding Toast (定位結果浮動通知) */
 #geocode-toast {
   position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%);
   background: var(--bg-card); border: 1px solid var(--border);
@@ -308,7 +322,8 @@ body {
   transition: opacity 0.3s;
 }
 
-/* ==================== Delivered State ==================== */
+/* ==================== Delivered State (已送達狀態) ==================== */
+/* 已送達的卡片降低透明度、文字加刪除線，視覺上「完成」的感覺 */
 .item-card.delivered {
   opacity: 0.45;
   background: rgba(17, 24, 39, 0.5);
@@ -322,7 +337,7 @@ body {
   text-decoration: line-through;
 }
 
-/* Card checkbox */
+/* Card Checkbox (清單卡片上的送達勾選框) */
 .card-check {
   display: flex;
   align-items: center;
@@ -337,7 +352,7 @@ body {
   flex-shrink: 0;
 }
 
-/* Popup checkbox */
+/* Popup Checkbox (地圖彈窗中的送達勾選框) */
 .popup-delivered-check {
   display: flex;
   align-items: center;
