@@ -111,8 +111,36 @@ function fitMapToMarkers() {
   map.fitBounds(group.getBounds().pad(0.1));
 }
 
+/**
+ * 移除符合條件的 markers (增量操作用)
+ * @param {function} filterFn - 回傳 true 的 marker 會被移除
+ */
+function removeMarkersFor(filterFn) {
+  const { map, markers } = window.App;
+  const toRemove = markers.filter(filterFn);
+  toRemove.forEach(m => map.removeLayer(m));
+  window.App.markers = markers.filter(m => !toRemove.includes(m));
+}
+
+/**
+ * 更新指定 source 的所有 marker 顏色 (不重建)
+ * @param {string} sourceId - CSV 來源 ID
+ * @param {string} newColor - 新顏色 hex
+ */
+function updateMarkersColor(sourceId, newColor) {
+  const { markers, createMarkerIcon, deliveredSet } = window.App;
+  markers.forEach(m => {
+    if (m._itemData.sourceId === sourceId) {
+      const isDelivered = deliveredSet.has(m._itemDetailNo);
+      m.setIcon(createMarkerIcon(newColor, isDelivered));
+      m._sourceColor = newColor;
+    }
+  });
+}
+
 // ==================== 匯出到全域命名空間 ====================
 window.App = window.App || {};
 Object.assign(window.App, {
   initMap, clearMarkers, buildPopupHtml, addMarker, fitMapToMarkers,
+  removeMarkersFor, updateMarkersColor,
 });

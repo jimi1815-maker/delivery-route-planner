@@ -86,6 +86,7 @@ function parseGeneralRow(row, idx, sourceId) {
   return {
     id: `${sourceId}-${idx}`,
     sourceId,
+    district: cleanVal(row[COL.SYS_DISTRICT]),
     detailNo: cleanVal(row[COL.DETAIL_NO]),
     receiverName: cleanVal(row[COL.RECEIVER_NAME]),
     phone: cleanVal(row[COL.RECEIVER_PHONE]),
@@ -110,6 +111,7 @@ function parseRetentionRow(row, idx, sourceId) {
   return {
     id: `${sourceId}-${idx}`,
     sourceId,
+    district: cleanVal(row[COL_PREV.DISTRICT]),
     detailNo: cleanVal(row[COL_PREV.DETAIL_NO]),
     receiverName: cleanVal(row[COL_PREV.RECEIVER_NAME]),
     phone: 'N/A',
@@ -185,6 +187,7 @@ async function handleFileUpload(file) {
       selectedDistricts: [],
       allDistricts,
       rawRows: rows,
+      itemsByDistrict: {},  // per-district session cache (parse + geocode 結果)
     };
 
     csvSources.push(source);

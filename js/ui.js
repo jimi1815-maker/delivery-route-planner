@@ -101,10 +101,12 @@ function renderCsvSourceList() {
     removeBtn.textContent = '✕';
     removeBtn.title = '移除';
     removeBtn.addEventListener('click', () => {
+      // 先移除該 source 的所有 markers
+      onClearAll(source);
       const sIdx = csvSources.findIndex(s => s.id === source.id);
       if (sIdx > -1) csvSources.splice(sIdx, 1);
       renderCsvSourceList();
-      refreshMapAndList();
+      syncListAndCount();
     });
 
     row.appendChild(nameEl);
@@ -153,9 +155,9 @@ function _createColorDropdown(source, palette) {
       dropdown.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
       swatch.classList.add('selected');
       dropdown.classList.add('hidden');
-      // If districts are selected, refresh map immediately
+      // If districts are selected, update marker colors immediately
       if (source.selectedDistricts.length > 0) {
-        refreshMapAndList();
+        onColorChanged(source);
       }
     });
 
@@ -200,12 +202,13 @@ function _createDistrictMultiSelect(source) {
   const selectAllBtn = document.createElement('button');
   selectAllBtn.textContent = '全選';
   selectAllBtn.className = 'ms-ctrl-btn';
-  selectAllBtn.addEventListener('click', (e) => {
+  selectAllBtn.addEventListener('click', async (e) => {
     e.stopPropagation();
+    const prev = [...source.selectedDistricts];
     source.selectedDistricts = [...source.allDistricts];
     _syncCheckboxes(dropdown, source);
     _updateTriggerText(trigger, source);
-    refreshMapAndList();
+    await onSelectAll(source);
   });
 
   const clearAllBtn = document.createElement('button');
@@ -216,7 +219,7 @@ function _createDistrictMultiSelect(source) {
     source.selectedDistricts = [];
     _syncCheckboxes(dropdown, source);
     _updateTriggerText(trigger, source);
-    refreshMapAndList();
+    onClearAll(source);
   });
 
   controls.appendChild(selectAllBtn);
@@ -232,7 +235,7 @@ function _createDistrictMultiSelect(source) {
     cb.type = 'checkbox';
     cb.value = district;
     cb.checked = source.selectedDistricts.includes(district);
-    cb.addEventListener('change', () => {
+    cb.addEventListener('change', async () => {
       if (cb.checked) {
         if (!source.selectedDistricts.includes(district)) {
           source.selectedDistricts.push(district);
@@ -241,7 +244,7 @@ function _createDistrictMultiSelect(source) {
         source.selectedDistricts = source.selectedDistricts.filter(d => d !== district);
       }
       _updateTriggerText(trigger, source);
-      refreshMapAndList();
+      await onDistrictToggled(source, district, cb.checked);
     });
 
     const text = document.createElement('span');
@@ -288,119 +291,208 @@ function _syncCheckboxes(dropdown, source) {
   });
 }
 
-// ==================== Map & List Refresh (地圖與清單刷新) ====================
+// ==================== Targeted Operations (增量操作) ====================
+
 /**
- * 根據所有 csvSources 當前的 selectedDistricts 重新渲染地圖與清單
- * 1. 清除所有 markers
- * 2. 收集每個 source 的已選配區 items
- * 3. 批次 Geocode
- * 4. addMarker 帶上 source 的 color
- * 5. renderList
- * 6. fitMapToMarkers
+ * 配區勾選/取消 — 增量操作
+ * 勾選: 從 itemsByDistrict 快取讀取 (已載入) 或首次 parse+geocode
+ * 取消: 移除該配區的 markers
  */
-async function refreshMapAndList() {
+async function onDistrictToggled(source, district, isAdding) {
+  const { addMarker, removeMarkersFor, fitMapToMarkers } = window.App;
+
+  if (isAdding) {
+    if (!source.itemsByDistrict[district]) {
+      // 首次載入: parse + geocode
+      await loadDistrictItems(source, district);
+    }
+    // 從快取加入 markers
+    const items = source.itemsByDistrict[district] || [];
+    items.forEach(item => {
+      item._sourceColor = source.color;
+      if (item.lat && item.lng) {
+        addMarker(item, source.color);
+      }
+    });
+    if (items.length > 0) fitMapToMarkers();
+  } else {
+    // 移除該配區的 markers (快取保留)
+    removeMarkersFor(m =>
+      m._itemData.sourceId === source.id && m._itemData.district === district
+    );
+  }
+
+  syncListAndCount();
+}
+
+/**
+ * 全選 — 批次載入所有未載入的配區，加入已載入的
+ */
+async function onSelectAll(source) {
+  const { addMarker, fitMapToMarkers } = window.App;
+
+  // 找出需要首次載入的配區
+  const needLoad = source.allDistricts.filter(d => !source.itemsByDistrict[d]);
+  const alreadyLoaded = source.allDistricts.filter(d => source.itemsByDistrict[d]);
+
+  // 立即加入已載入的
+  alreadyLoaded.forEach(district => {
+    // 檢查是否已經在地圖上 (避免重複)
+    if (!source.selectedDistricts.includes(district) || !_districtHasMarkers(source.id, district)) {
+      const items = source.itemsByDistrict[district] || [];
+      items.forEach(item => {
+        item._sourceColor = source.color;
+        if (item.lat && item.lng) {
+          addMarker(item, source.color);
+        }
+      });
+    }
+  });
+
+  // 批次載入未載入的
+  for (const district of needLoad) {
+    await loadDistrictItems(source, district);
+    const items = source.itemsByDistrict[district] || [];
+    items.forEach(item => {
+      item._sourceColor = source.color;
+      if (item.lat && item.lng) {
+        addMarker(item, source.color);
+      }
+    });
+  }
+
+  fitMapToMarkers();
+  syncListAndCount();
+}
+
+/**
+ * 清除 — 移除該 source 的所有 markers
+ */
+function onClearAll(source) {
+  const { removeMarkersFor } = window.App;
+  removeMarkersFor(m => m._itemData.sourceId === source.id);
+  syncListAndCount();
+}
+
+/** 檢查某 source+district 是否已有 markers 在地圖上 */
+function _districtHasMarkers(sourceId, district) {
+  return window.App.markers.some(m =>
+    m._itemData.sourceId === sourceId && m._itemData.district === district
+  );
+}
+
+/**
+ * 換顏色 — 只更新 marker icon，不重建
+ */
+function onColorChanged(source) {
+  window.App.updateMarkersColor(source.id, source.color);
+  syncListAndCount();
+}
+
+/**
+ * 首次載入某配區: parse rawRows → geocode → 存入 itemsByDistrict
+ * 只在該配區第一次被勾選時呼叫
+ */
+async function loadDistrictItems(source, district) {
   const {
-    csvSources, cleanVal, cleanAddress, cleanAddressForGeo,
-    clearMarkers, addMarker, fitMapToMarkers,
-    getApiKey, openSettings, geocodeAddress,
+    cleanVal, cleanAddressForGeo, geocodeAddress,
     parseGeneralRow, parseRetentionRow,
-    itemList, itemCount, COL, COL_PREV,
+    getApiKey, openSettings, COL, COL_PREV,
   } = window.App;
 
-  clearMarkers();
-  itemList.innerHTML = '';
+  // Check API key
+  if (!getApiKey()) {
+    openSettings();
+    showToast('⚠️ 請先設定 Google Maps API Key');
+    return;
+  }
 
-  // Collect all items from all sources with selected districts
+  const districtCol = source.type === 'general' ? COL.SYS_DISTRICT : COL_PREV.DISTRICT;
+  const parser = source.type === 'general' ? parseGeneralRow : parseRetentionRow;
+
+  // Parse rows for this district
+  const items = [];
+  source.rawRows.forEach((row, idx) => {
+    const d = cleanVal(row[districtCol]);
+    if (d === district) {
+      items.push(parser(row, idx, source.id));
+    }
+  });
+
+  // Filter geocodable addresses
+  const geocodeItems = items.filter(item =>
+    item.addressRaw && !item.addressRaw.includes('站止') && !item.addressRaw.includes('止')
+  );
+
+  if (geocodeItems.length > 0) {
+    showLoading(`正在定位配區 ${district} (${geocodeItems.length} 個地址)...`);
+
+    let completed = 0;
+    const total = geocodeItems.length;
+    const BATCH_SIZE = 5;
+
+    for (let i = 0; i < geocodeItems.length; i += BATCH_SIZE) {
+      const batch = geocodeItems.slice(i, i + BATCH_SIZE);
+
+      const promises = batch.map(async (item) => {
+        try {
+          const addrForSearch = cleanAddressForGeo(item.addressRaw);
+          const result = await geocodeAddress(item.addressRaw, addrForSearch);
+          if (result) {
+            item.lat = result.lat;
+            item.lng = result.lng;
+            item.geocodeStatus = 'located';
+          } else {
+            item.geocodeStatus = 'failed';
+          }
+        } catch (e) {
+          item.geocodeStatus = 'failed';
+        }
+        completed++;
+        updateProgress(completed, total);
+      });
+
+      await Promise.allSettled(promises);
+
+      if (i + BATCH_SIZE < geocodeItems.length) {
+        await new Promise(r => setTimeout(r, 300));
+      }
+    }
+
+    hideLoading();
+
+    const located = items.filter(i => i.geocodeStatus === 'located').length;
+    showToast(`✅ 配區 ${district}: ${located}/${geocodeItems.length} 個地址已定位`);
+  }
+
+  // Store in cache (包含 geocode 結果)
+  source.itemsByDistrict[district] = items;
+}
+
+/**
+ * 輕量同步: 從所有 source 的 itemsByDistrict 重建 filteredItems + 重新渲染清單
+ * 不觸發 geocode，不操作 markers (markers 已由上層函數管理)
+ */
+function syncListAndCount() {
+  const { csvSources, itemCount } = window.App;
+
   const allItems = [];
   csvSources.forEach(source => {
-    if (source.type === 'error' || source.selectedDistricts.length === 0) return;
-
-    const districtCol = source.type === 'general' ? COL.SYS_DISTRICT : COL_PREV.DISTRICT;
-    const parser = source.type === 'general' ? parseGeneralRow : parseRetentionRow;
-
-    source.rawRows.forEach((row, idx) => {
-      const district = cleanVal(row[districtCol]);
-      if (source.selectedDistricts.includes(district)) {
-        const item = parser(row, idx, source.id);
-        item._sourceColor = source.color;
-        allItems.push(item);
+    if (source.type === 'error') return;
+    source.selectedDistricts.forEach(district => {
+      const items = source.itemsByDistrict[district];
+      if (items) {
+        items.forEach(item => {
+          item._sourceColor = source.color;
+          allItems.push(item);
+        });
       }
     });
   });
 
   window.App.filteredItems = allItems;
   itemCount.textContent = allItems.length > 0 ? `${allItems.length} 筆` : '';
-
-  if (allItems.length === 0) {
-    renderList();
-    return;
-  }
-
-  // Check API key before geocoding
-  if (!getApiKey()) {
-    renderList();
-    openSettings();
-    showToast('⚠️ 請先設定 Google Maps API Key');
-    return;
-  }
-
-  // Render list first (with pending status)
   renderList();
-
-  // Filter out "站止" addresses
-  const geocodeItems = allItems.filter(item =>
-    item.addressRaw && !item.addressRaw.includes('站止') && !item.addressRaw.includes('止')
-  );
-
-  // Show loading
-  showLoading(`正在定位 ${geocodeItems.length} 個地址...`);
-
-  // Geocode in batches of 5 to avoid rate limiting
-  let completed = 0;
-  const total = geocodeItems.length;
-  const BATCH_SIZE = 5;
-
-  for (let i = 0; i < geocodeItems.length; i += BATCH_SIZE) {
-    const batch = geocodeItems.slice(i, i + BATCH_SIZE);
-
-    const promises = batch.map(async (item) => {
-      try {
-        const addrForSearch = cleanAddressForGeo(item.addressRaw);
-        console.log(`[Geocode] 搜尋: "${addrForSearch}"`);
-        const result = await geocodeAddress(item.addressRaw, addrForSearch);
-        if (result) {
-          item.lat = result.lat;
-          item.lng = result.lng;
-          item.geocodeStatus = 'located';
-          addMarker(item, item._sourceColor);
-          console.log(`[Geocode] ✅ ${item.receiverName}: ${result.lat}, ${result.lng}`);
-        } else {
-          item.geocodeStatus = 'failed';
-          console.warn(`[Geocode] ❌ 找不到: "${addrForSearch}"`);
-        }
-      } catch (e) {
-        item.geocodeStatus = 'failed';
-        console.error(`[Geocode] 錯誤: "${item.addressRaw}"`, e);
-      }
-      completed++;
-      updateProgress(completed, total);
-      updateCardStatus(item);
-    });
-
-    await Promise.allSettled(promises);
-
-    // Wait between batches to respect rate limits
-    if (i + BATCH_SIZE < geocodeItems.length) {
-      await new Promise(r => setTimeout(r, 300));
-    }
-  }
-
-  hideLoading();
-  fitMapToMarkers();
-  switchTab('map');
-
-  const located = allItems.filter(i => i.geocodeStatus === 'located').length;
-  showToast(`✅ 定位完成: ${located}/${geocodeItems.length} 個地址`);
 }
 
 // ==================== UI Rendering (介面渲染) ====================
@@ -530,6 +622,7 @@ function initEventListeners() {
 window.App = window.App || {};
 Object.assign(window.App, {
   escHtml, showLoading, hideLoading, updateProgress, showToast,
-  switchTab, renderCsvSourceList, refreshMapAndList,
+  switchTab, renderCsvSourceList, syncListAndCount,
+  onDistrictToggled, onSelectAll, onClearAll, onColorChanged,
   renderList, updateCardStatus, initEventListeners,
 });
