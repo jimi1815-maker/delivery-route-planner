@@ -1,69 +1,79 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
+
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <!-- PWA: iOS Safari 全螢幕模式 -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="路線規劃">
+  <!-- 瀏覽器主題色 (對應深色背景) -->
   <meta name="theme-color" content="#0a0e17">
   <meta name="description" content="每日送貨路線規劃工具 - 上傳CSV、地圖標點、Google Maps導航">
   <title>路線規劃</title>
+  <!-- PWA Manifest & Icons -->
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icon-192.png">
+  <!-- 外部依賴: Leaflet 地圖函式庫 -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <!-- 中文字型: Noto Sans TC -->
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
 
-  <!-- ============ Upload Screen ============ -->
-  <div id="upload-screen">
-    <div class="upload-container">
-      <div class="app-logo">🚚</div>
-      <h1>路線規劃</h1>
-      <p class="subtitle">上傳每日送貨 CSV 開始配送</p>
-      <div id="drop-zone">
-        <div class="drop-icon">📂</div>
-        <p>點擊上傳或拖曳 CSV 檔案</p>
-        <input type="file" id="csv-input" accept=".csv">
-      </div>
-      <button id="upload-settings-btn" class="settings-link">⚙️ 設定 API Key</button>
-    </div>
-  </div>
-
-  <!-- ============ Main Screen ============ -->
-  <div id="main-screen" class="hidden">
-    <!-- Top Bar -->
+  <!-- ============ Main Screen (直接顯示) ============ -->
+  <!-- 主畫面: 包含 Header / CSV 來源管理 / Tab 切換 / 地圖+清單 -->
+  <div id="main-screen">
+    <!-- Top Bar: 應用標題 + 設定按鈕 -->
     <header id="top-bar">
       <div class="header-left">
         <span class="logo-small">🚚</span>
         <h2>路線規劃</h2>
       </div>
       <div class="header-right">
+        <span id="item-count"></span>
         <button id="settings-btn" title="設定">⚙️</button>
-        <button id="re-upload-btn" title="重新上傳">📂</button>
       </div>
     </header>
 
-    <!-- Filter Bar -->
-    <div id="filter-bar">
-      <select id="district-select">
-        <option value="">選擇配區</option>
-      </select>
-      <span id="item-count"></span>
+    <!-- CSV Source Bar: 多 CSV 來源管理區 -->
+    <div id="csv-source-bar">
+      <div id="csv-source-list">
+        <!-- 動態渲染: CSV 來源列表 + ➕ 新增按鈕 -->
+      </div>
+      <input type="file" id="csv-add-input" accept=".csv" class="hidden">
     </div>
 
-    <!-- Tab Bar -->
+    <!-- Tab Bar: 地圖 / 清單 雙頁面切換 -->
     <div id="tab-bar">
       <button class="tab-btn active" data-tab="map">🗺️ 地圖</button>
       <button class="tab-btn" data-tab="list">📋 清單</button>
     </div>
 
-    <!-- Content Area -->
+    <!-- Content Area: 地圖 (Leaflet) 與清單 (卡片列表) -->
     <div id="content-area">
+      <!-- Geocoding 進度條 (非阻塞式，覆蓋在內容區頂端) -->
+      <div id="geocode-progress" class="hidden">
+        <div class="geocode-progress-fill" id="progress-fill"></div>
+        <span class="geocode-progress-text" id="loading-text"></span>
+      </div>
       <div id="map-view">
         <div id="map"></div>
+        <!-- 溫層篩選控制面板 (地圖右上角) -->
+        <div id="temp-zone-control">
+          <label class="tz-option">
+            <input type="checkbox" id="tz-frozen" onchange="window.App.onTempZoneFilterChange()">
+            <span>凍</span>
+          </label>
+          <label class="tz-option">
+            <input type="checkbox" id="tz-chilled" onchange="window.App.onTempZoneFilterChange()">
+            <span>藏</span>
+          </label>
+        </div>
       </div>
       <div id="list-view" class="hidden">
         <div id="item-list"></div>
@@ -71,17 +81,12 @@
     </div>
   </div>
 
-  <!-- ============ Loading Overlay ============ -->
-  <div id="loading-overlay" class="hidden">
-    <div class="loading-spinner"></div>
-    <p id="loading-text">正在定位地址...</p>
-    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
-  </div>
-
   <!-- ============ Geocode Toast ============ -->
+  <!-- 定位完成後的浮動通知 -->
   <div id="geocode-toast" class="hidden"></div>
 
   <!-- ============ Settings Modal ============ -->
+  <!-- Google Maps API Key 設定彈窗，Key 只存在 localStorage 不上傳 -->
   <div id="settings-modal" class="hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content">
@@ -97,7 +102,17 @@
     </div>
   </div>
 
+  <!-- 外部依賴: Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="app.js"></script>
+  <!-- 應用邏輯: 依功能拆分為獨立模組，按依賴順序載入 -->
+  <script src="js/constants.js"></script> <!-- 常數定義: CSV 欄位索引、DivIcon、色盤 -->
+  <script src="js/csv.js"></script> <!-- CSV 檔案處理: 編碼偵測、類型偵測、解析 -->
+  <script src="js/geocoding.js"></script> <!-- 地址轉經緯度: API 呼叫、快取、地址清理 -->
+  <script src="js/map.js"></script> <!-- Leaflet 地圖: 初始化、標記管理 -->
+  <script src="js/delivered.js"></script> <!-- 送達狀態: 每日重置、localStorage 同步 -->
+  <script src="js/settings.js"></script> <!-- API Key 管理: 設定彈窗 -->
+  <script src="js/ui.js"></script> <!-- UI 互動: CSV 來源列表、多選配區、渲染 -->
+  <script src="app.js"></script> <!-- 進入點: 狀態初始化、DOM 參照、啟動流程 -->
 </body>
+
 </html>
