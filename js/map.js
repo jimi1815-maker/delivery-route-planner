@@ -103,8 +103,8 @@ function buildGroupPopupHtml(items) {
 
   // 共用導航 (地址相同)
   const firstEntry = mergedEntries[0];
-  const encodedAddr = encodeURIComponent(firstEntry.addressRaw);
-  const navUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodedAddr}`;
+  const { lat, lng } = items[0];
+  const navUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
 
   let html = '<div class="popup-content">';
 
